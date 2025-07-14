@@ -9,6 +9,13 @@ const commentRoutes = require('./src/routes/commentRoutes'); // Import comment r
 const characterRoutes = require('./src/routes/characterRoutes'); // Import character routes
 const mapItemRoutes = require('./src/routes/mapItemRoutes'); // Import map item routes
 const statRoutes = require('./src/routes/statRoutes'); // Import stat routes
+const adminBookRoutes = require('./src/routes/adminBookRoutes');
+const adminChapterRoutes = require('./src/routes/adminChapterRoutes');
+const adminNoteRoutes = require('./src/routes/adminNoteRoutes');
+const adminCommentRoutes = require('./src/routes/adminCommentRoutes');
+const adminCharacterRoutes = require('./src/routes/adminCharacterRoutes');
+const adminMapItemRoutes = require('./src/routes/adminMapItemRoutes');
+const adminStatRoutes = require('./src/routes/adminStatRoutes');
 // const pool = require('./config/db'); // Đảm bảo DB được kết nối khi khởi động
 
 const app = express();
@@ -28,6 +35,13 @@ app.use('/api/comments', commentRoutes); // Mount comment routes
 app.use('/api/characters', characterRoutes); // Mount character routes
 app.use('/api/map-items', mapItemRoutes); // Mount map item routes
 app.use('/api/stats', statRoutes); // Mount stat routes
+app.use('/api/admin/books', adminBookRoutes);
+app.use('/api/admin/chapters', adminChapterRoutes);
+app.use('/api/admin/notes', adminNoteRoutes);
+app.use('/api/admin/comments', adminCommentRoutes);
+app.use('/api/admin/characters', adminCharacterRoutes);
+app.use('/api/admin/map-items', adminMapItemRoutes);
+app.use('/api/admin/stats', adminStatRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

@@ -1,0 +1,435 @@
+openapi: 3.0.3
+info:
+  title: Auth & Book Management API
+  version: "1.0.0"
+  description: |
+    This API provides authentication, and CRUD operations for books, chapters, notes, comments, characters, map items, and stats.
+servers:
+  - url: http://localhost:3000
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UserRegister:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    UserLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        token2FA:
+          type: string
+    Book:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        genre:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Chapter:
+      type: object
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        order_index:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+    Note:
+      type: object
+      properties:
+        id: { type: integer }
+        chapter_id: { type: integer }
+        content: { type: string }
+        line_position: { type: integer }
+        created_at:
+          type: string
+          format: date-time
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        chapter_id: { type: integer }
+        content: { type: string }
+        created_at:
+          type: string
+          format: date-time
+    Character:
+      type: object
+      properties:
+        id: { type: integer }
+        book_id: { type: integer }
+        name: { type: string }
+        alias: { type: string }
+        gender: { type: string }
+        age: { type: integer }
+        physical_description: { type: string }
+        backstory: { type: string }
+        role: { type: string }
+        relations: { type: string }
+    MapItem:
+      type: object
+      properties:
+        id: { type: integer }
+openapi: 3.0.3
+info:
+  title: Auth & Content Management API
+  version: "1.0.0"
+  description: |
+    API for authentication and CRUD operations on books, chapters, notes, comments,
+    characters, map items, and stats, with admin back-office.
+servers:
+  - url: http://localhost:3000
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UserRegister:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    UserLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+    Tokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+    Book:
+      type: object
+      required: [title]
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        genre:
+          type: string
+        status:
+          type: string
+    Chapter:
+      type: object
+      required: [book_id, title]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        order_index:
+          type: integer
+    Note:
+      type: object
+      required: [chapter_id, content]
+      properties:
+        id:
+          type: integer
+        chapter_id:
+          type: integer
+        content:
+          type: string
+        line_position:
+          type: integer
+    Comment:
+      type: object
+      required: [chapter_id, content]
+      properties:
+        id:
+          type: integer
+        chapter_id:
+          type: integer
+        content:
+          type: string
+    Character:
+      type: object
+      required: [book_id, name]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        name:
+          type: string
+        alias:
+          type: string
+        gender:
+          type: string
+        age:
+          type: integer
+        physical_description:
+          type: string
+        backstory:
+          type: string
+        role:
+          type: string
+        relations:
+          type: string
+    MapItem:
+      type: object
+      required: [book_id, type, name, x, y]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        type:
+          type: string
+          enum: [city, place, route]
+        name:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        description:
+          type: string
+    Stat:
+      type: object
+      required: [book_id, word_count, letter_count]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        word_count:
+          type: integer
+        letter_count:
+          type: integer
+        total_goal:
+          type: integer
+        weekly_goal:
+          type: integer
+        deadline:
+          type: string
+          format: date
+paths:
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201': { description: User created }
+  /api/auth/login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tokens'
+  /api/auth/refresh-token:
+    post:
+      summary: Refresh access token
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                properties:
+                  accessToken:
+                    type: string
+  /api/auth/logout:
+    post:
+      summary: Logout user
+      responses:
+        '200': { description: Logged out }
+  /api/auth/enable-2fa:
+    post:
+      summary: Enable 2FA
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: 2FA enabled }
+  /api/auth/verify-2fa:
+    post:
+      summary: Verify 2FA token
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token2FA:
+                  type: string
+      responses:
+        '200': { description: 2FA verified }
+  /api/auth/check-token:
+    get:
+      summary: Check access token validity
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Token is valid }
+  /api/books:
+    get:
+      summary: Get all books for user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of books
+    post:
+      summary: Create a new book
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Book'
+      responses:
+        '201': { description: Book created }
+  /api/books/{id}:
+    parameters:
+      - in: path
+        name: id
+        schema: { type: integer }
+        required: true
+    get:
+      summary: Get book by ID
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Book details }
+    put:
+      summary: Update a book
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Book'
+      responses:
+        '200': { description: Updated }
+    delete:
+      summary: Delete a book
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Deleted }
+  /api/chapters:
+    get:
+      summary: Get all chapters
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: List of chapters }
+    post:
+      summary: Create a new chapter
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chapter'
+      responses:
+        '201': { description: Chapter created }
+  /api/chapters/{id}:
+    parameters:
+      - in: path
+        name: id
+        schema: { type: integer }
+        required: true
+    get:
+      summary: Get chapter by ID
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Chapter details }
+    put:
+      summary: Update a chapter
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chapter'
+      responses:
+        '200': { description: Updated }
+    delete:
+      summary: Delete a chapter
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { description: Deleted }

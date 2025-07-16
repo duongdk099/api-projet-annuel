@@ -5,7 +5,7 @@ const path = require("path");
 
 // Import the OpenAPI document
 const openApiDocument = YAML.load(
-  path.join(__dirname, "..", "openapi-complete.yaml")
+  path.join(__dirname, "..", "openapi.yaml")
 );
 
 // Create an Express router for Swagger documentation

@@ -1,7 +1,9 @@
 const express = require('express');
 const cookieParser = require('cookie-parser'); // Cần để đọc cookie cho refresh token
+const path = require('path');
 require('dotenv').config();
 const authRoutes = require('./routes/authRoutes');
+const swaggerRoutes = require('./routes/swaggerRoutes');
 const bookRoutes = require('./src/routes/bookRoutes'); // Import book routes
 const chapterRoutes = require('./src/routes/chapterRoutes'); // Import chapter routes
 const noteRoutes = require('./src/routes/noteRoutes'); // Import note routes
@@ -20,6 +22,9 @@ const adminStatRoutes = require('./src/routes/adminStatRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Serve the new comprehensive API documentation
+app.use('/api-docs', swaggerRoutes);
 
 // Middlewares
 app.use(express.json()); // Để parse JSON body

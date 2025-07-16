@@ -1,0 +1,2084 @@
+openapi: 3.0.3
+info:
+  title: Auth & Content Management API
+  version: "1.0.0"
+  description: |
+    Complete API documentation for authentication and CRUD operations on books, 
+    chapters, notes, comments, characters, map items, and stats, with admin back-office.
+servers:
+  - url: http://localhost:3000
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [member, admin]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserRegister:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 6
+    
+    UserLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        token2FA:
+          type: string
+    
+    TokenResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        accessToken:
+          type: string
+        userId:
+          type: integer
+        email:
+          type: string
+        role:
+          type: string
+
+    Book:
+      type: object
+      required: [title]
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        genre:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    
+    Chapter:
+      type: object
+      required: [book_id, title]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        order_index:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+    
+    Note:
+      type: object
+      required: [chapter_id, content]
+      properties:
+        id:
+          type: integer
+        chapter_id:
+          type: integer
+        content:
+          type: string
+        line_position:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    
+    Comment:
+      type: object
+      required: [chapter_id, content]
+      properties:
+        id:
+          type: integer
+        chapter_id:
+          type: integer
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    
+    Character:
+      type: object
+      required: [book_id, name]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        name:
+          type: string
+        alias:
+          type: string
+        gender:
+          type: string
+        age:
+          type: integer
+        physical_description:
+          type: string
+        backstory:
+          type: string
+        role:
+          type: string
+        relations:
+          type: string
+    
+    MapItem:
+      type: object
+      required: [book_id, type, name, x, y]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        type:
+          type: string
+          enum: [city, place, route]
+        name:
+          type: string
+        x:
+          type: number
+        y:
+          type: number
+        description:
+          type: string
+    
+    Stat:
+      type: object
+      required: [book_id, word_count, letter_count]
+      properties:
+        id:
+          type: integer
+        book_id:
+          type: integer
+        word_count:
+          type: integer
+        letter_count:
+          type: integer
+        total_goal:
+          type: integer
+        weekly_goal:
+          type: integer
+        deadline:
+          type: string
+          format: date
+    
+    ApiResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          type: object
+
+paths:
+  # =================== AUTH ROUTES ===================
+  /api/auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account with member role
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  userId:
+                    type: integer
+        '400':
+          description: Invalid input (email/password missing or password too short)
+        '409':
+          description: Email already in use
+        '500':
+          description: Internal server error
+
+  /api/auth/register-admin:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new admin user
+      description: Create a new user account with admin role
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegister'
+      responses:
+        '201':
+          description: Admin user registered successfully
+        '400':
+          description: Invalid input
+        '409':
+          description: Email already in use
+        '500':
+          description: Internal server error
+
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticate user and return tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Missing credentials
+        '401':
+          description: Invalid credentials or 2FA token required/invalid
+        '500':
+          description: Internal server error
+
+  /api/auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get a new access token using refresh token (from HttpOnly cookie)
+      security: []
+      responses:
+        '200':
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+        '401':
+          description: Refresh token not found
+        '403':
+          description: Invalid refresh token
+        '500':
+          description: Internal server error
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Clear refresh token from database and browser cookie
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully.
+
+  /api/auth/enable-2fa:
+    post:
+      tags:
+        - Authentication
+      summary: Enable 2FA for user
+      description: Generate and store 2FA secret for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 2FA enabled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  secret:
+                    type: string
+                  otpauth_url:
+                    type: string
+        '400':
+          description: 2FA already enabled
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+
+  /api/auth/verify-2fa:
+    post:
+      tags:
+        - Authentication
+      summary: Verify 2FA token
+      description: Validate a 2FA token for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token2FA:
+                  type: string
+      responses:
+        '200':
+          description: 2FA token verified successfully
+        '400':
+          description: Token missing or 2FA not enabled
+        '401':
+          description: Invalid 2FA token
+        '500':
+          description: Internal server error
+
+  /api/auth/check-token:
+    get:
+      tags:
+        - Authentication
+      summary: Check token validity
+      description: Validate the access token and return user information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid or expired token
+
+  # =================== USER ROUTES ===================
+  
+  # --------- Books ---------
+  /api/books:
+    get:
+      tags:
+        - Books
+      summary: Get all books for user
+      description: Returns all books owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of books
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Books
+      summary: Create a new book
+      description: Create a new book for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                genre:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '201':
+          description: Book created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Book'
+        '400':
+          description: Invalid input
+        '500':
+          description: Internal server error
+
+  /api/books/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Book ID
+    
+    get:
+      tags:
+        - Books
+      summary: Get book by ID
+      description: Returns a book by ID if owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Book details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Book'
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Books
+      summary: Update a book
+      description: Update a book if owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                genre:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Book updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Book'
+        '400':
+          description: Invalid input or book ID
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Books
+      summary: Delete a book
+      description: Delete a book if owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Book deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  # --------- Chapters ---------
+  /api/chapters:
+    get:
+      tags:
+        - Chapters
+      summary: Get all chapters
+      description: Returns all chapters for books owned by the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: book_id
+          in: query
+          schema:
+            type: integer
+          description: Filter chapters by book ID
+      responses:
+        '200':
+          description: List of chapters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Chapter'
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Chapters
+      summary: Create a new chapter
+      description: Create a new chapter for a book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - book_id
+                - title
+              properties:
+                book_id:
+                  type: integer
+                title:
+                  type: string
+                content:
+                  type: string
+                order_index:
+                  type: integer
+                  default: 0
+      responses:
+        '201':
+          description: Chapter created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Chapter'
+        '400':
+          description: Invalid input
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/chapters/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Chapter ID
+    
+    get:
+      tags:
+        - Chapters
+      summary: Get chapter by ID
+      description: Returns a chapter by ID if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Chapter details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Chapter'
+        '400':
+          description: Invalid chapter ID
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Chapters
+      summary: Update a chapter
+      description: Update a chapter if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                order_index:
+                  type: integer
+      responses:
+        '200':
+          description: Chapter updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Chapter'
+        '400':
+          description: Invalid input or chapter ID
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Chapters
+      summary: Delete a chapter
+      description: Delete a chapter if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Chapter deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid chapter ID
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/books/{bookId}/chapters:
+    parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Book ID
+    
+    get:
+      tags:
+        - Chapters
+      summary: Get chapters by book ID
+      description: Returns all chapters for a specific book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of chapters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Chapter'
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  # --------- Notes ---------
+  /api/notes:
+    get:
+      tags:
+        - Notes
+      summary: Get all notes
+      description: Returns all notes for chapters whose books are owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Notes
+      summary: Create a new note
+      description: Create a new note for a chapter whose book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - chapter_id
+                - content
+              properties:
+                chapter_id:
+                  type: integer
+                content:
+                  type: string
+                line_position:
+                  type: integer
+      responses:
+        '201':
+          description: Note created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Note'
+        '400':
+          description: Invalid input
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/notes/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Note ID
+    
+    get:
+      tags:
+        - Notes
+      summary: Get note by ID
+      description: Returns a note by ID if its chapter's book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Note details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Note'
+        '400':
+          description: Invalid note ID
+        '404':
+          description: Note not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Notes
+      summary: Update a note
+      description: Update a note if its chapter's book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                line_position:
+                  type: integer
+      responses:
+        '200':
+          description: Note updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Note'
+        '400':
+          description: Invalid input or note ID
+        '404':
+          description: Note not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Notes
+      summary: Delete a note
+      description: Delete a note if its chapter's book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Note deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid note ID
+        '404':
+          description: Note not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/chapters/{chapterId}/notes:
+    parameters:
+      - name: chapterId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Chapter ID
+    
+    get:
+      tags:
+        - Notes
+      summary: Get notes by chapter ID
+      description: Returns all notes for a specific chapter whose book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Note'
+        '400':
+          description: Invalid chapter ID
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+
+  # --------- Comments ---------
+  /api/comments:
+    get:
+      tags:
+        - Comments
+      summary: Get all comments
+      description: Returns all comments for chapters whose books are owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Comments
+      summary: Create a new comment
+      description: Create a new comment for a chapter whose book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - chapter_id
+                - content
+              properties:
+                chapter_id:
+                  type: integer
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid input
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/comments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Comment ID
+    
+    get:
+      tags:
+        - Comments
+      summary: Get comment by ID
+      description: Returns a comment by ID if its chapter's book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Comment details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid comment ID
+        '404':
+          description: Comment not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Comments
+      summary: Update a comment
+      description: Update a comment if its chapter's book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Comment updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid input or comment ID
+        '404':
+          description: Comment not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Comments
+      summary: Delete a comment
+      description: Delete a comment if its chapter's book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Comment deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid comment ID
+        '404':
+          description: Comment not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/chapters/{chapterId}/comments:
+    parameters:
+      - name: chapterId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Chapter ID
+    
+    get:
+      tags:
+        - Comments
+      summary: Get comments by chapter ID
+      description: Returns all comments for a specific chapter whose book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+        '400':
+          description: Invalid chapter ID
+        '404':
+          description: Chapter not found or not owned by user
+        '500':
+          description: Internal server error
+
+  # --------- Characters ---------
+  /api/characters:
+    get:
+      tags:
+        - Characters
+      summary: Get all characters
+      description: Returns all characters for books owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of characters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Character'
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Characters
+      summary: Create a new character
+      description: Create a new character for a book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - book_id
+                - name
+              properties:
+                book_id:
+                  type: integer
+                name:
+                  type: string
+                alias:
+                  type: string
+                gender:
+                  type: string
+                age:
+                  type: integer
+                physical_description:
+                  type: string
+                backstory:
+                  type: string
+                role:
+                  type: string
+                relations:
+                  type: string
+      responses:
+        '201':
+          description: Character created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Character'
+        '400':
+          description: Invalid input
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/characters/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Character ID
+    
+    get:
+      tags:
+        - Characters
+      summary: Get character by ID
+      description: Returns a character by ID if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Character details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Character'
+        '400':
+          description: Invalid character ID
+        '404':
+          description: Character not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Characters
+      summary: Update a character
+      description: Update a character if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                alias:
+                  type: string
+                gender:
+                  type: string
+                age:
+                  type: integer
+                physical_description:
+                  type: string
+                backstory:
+                  type: string
+                role:
+                  type: string
+                relations:
+                  type: string
+      responses:
+        '200':
+          description: Character updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Character'
+        '400':
+          description: Invalid input or character ID
+        '404':
+          description: Character not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Characters
+      summary: Delete a character
+      description: Delete a character if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Character deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid character ID
+        '404':
+          description: Character not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/books/{bookId}/characters:
+    parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Book ID
+    
+    get:
+      tags:
+        - Characters
+      summary: Get characters by book ID
+      description: Returns all characters for a specific book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of characters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Character'
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  # --------- Map Items ---------
+  /api/map-items:
+    get:
+      tags:
+        - Map Items
+      summary: Get all map items
+      description: Returns all map items for books owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of map items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MapItem'
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Map Items
+      summary: Create a new map item
+      description: Create a new map item for a book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - book_id
+                - type
+                - name
+                - x
+                - y
+              properties:
+                book_id:
+                  type: integer
+                type:
+                  type: string
+                  enum: [city, place, route]
+                name:
+                  type: string
+                x:
+                  type: number
+                y:
+                  type: number
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Map item created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/MapItem'
+        '400':
+          description: Invalid input
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/map-items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Map Item ID
+    
+    get:
+      tags:
+        - Map Items
+      summary: Get map item by ID
+      description: Returns a map item by ID if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Map item details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/MapItem'
+        '400':
+          description: Invalid map item ID
+        '404':
+          description: Map item not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Map Items
+      summary: Update a map item
+      description: Update a map item if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [city, place, route]
+                name:
+                  type: string
+                x:
+                  type: number
+                y:
+                  type: number
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Map item updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/MapItem'
+        '400':
+          description: Invalid input or map item ID
+        '404':
+          description: Map item not found or not owned by user
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Map Items
+      summary: Delete a map item
+      description: Delete a map item if its book is owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Map item deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid map item ID
+        '404':
+          description: Map item not found or not owned by user
+        '500':
+          description: Internal server error
+
+  /api/books/{bookId}/map-items:
+    parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Book ID
+    
+    get:
+      tags:
+        - Map Items
+      summary: Get map items by book ID
+      description: Returns all map items for a specific book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of map items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MapItem'
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user
+        '500':
+          description: Internal server error
+
+  # --------- Stats ---------
+  /api/stats:
+    get:
+      tags:
+        - Stats
+      summary: Get all stats
+      description: Returns all stats for books owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Stat'
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Stats
+      summary: Create stats
+      description: Create stats for a book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - book_id
+                - word_count
+                - letter_count
+              properties:
+                book_id:
+                  type: integer
+                word_count:
+                  type: integer
+                letter_count:
+                  type: integer
+                total_goal:
+                  type: integer
+                weekly_goal:
+                  type: integer
+                deadline:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Stats created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Stat'
+        '400':
+          description: Invalid input
+        '404':
+          description: Book not found or not owned by user
+        '409':
+          description: Stats already exist for this book
+        '500':
+          description: Internal server error
+
+  /api/stats/{bookId}:
+    parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Book ID
+    
+    get:
+      tags:
+        - Stats
+      summary: Get stats by book ID
+      description: Returns stats for a specific book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Stat'
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user, or stats not found
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Stats
+      summary: Update stats
+      description: Update stats for a book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                word_count:
+                  type: integer
+                letter_count:
+                  type: integer
+                total_goal:
+                  type: integer
+                weekly_goal:
+                  type: integer
+                deadline:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Stats updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Stat'
+        '400':
+          description: Invalid input or book ID
+        '404':
+          description: Book not found or not owned by user, or stats not found
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Stats
+      summary: Delete stats
+      description: Delete stats for a book owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Stats deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid book ID
+        '404':
+          description: Book not found or not owned by user, or stats not found
+        '500':
+          description: Internal server error
+
+  # =================== ADMIN ROUTES ===================
+  
+  # --------- Admin Books ---------
+  /api/admin/books:
+    get:
+      tags:
+        - Admin Books
+      summary: Admin get all books
+      description: Returns all books in the system (admin access required)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of books
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+        '403':
+          description: Admin access required
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Admin Books
+      summary: Admin create a book
+      description: Create a new book (admin access required)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - title
+              properties:
+                user_id:
+                  type: integer
+                title:
+                  type: string
+                description:
+                  type: string
+                genre:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '201':
+          description: Book created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Book'
+        '400':
+          description: Invalid input
+        '403':
+          description: Admin access required
+        '500':
+          description: Internal server error
+
+  /api/admin/books/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+        description: Book ID
+    
+    get:
+      tags:
+        - Admin Books
+      summary: Admin get book by ID
+      description: Returns a book by ID (admin access required)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Book details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Book'
+        '400':
+          description: Invalid book ID
+        '403':
+          description: Admin access required
+        '404':
+          description: Book not found
+        '500':
+          description: Internal server error
+    
+    put:
+      tags:
+        - Admin Books
+      summary: Admin update a book
+      description: Update a book (admin access required)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                title:
+                  type: string
+                description:
+                  type: string
+                genre:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: Book updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Book'
+        '400':
+          description: Invalid input or book ID
+        '403':
+          description: Admin access required
+        '404':
+          description: Book not found
+        '500':
+          description: Internal server error
+    
+    delete:
+      tags:
+        - Admin Books
+      summary: Admin delete a book
+      description: Delete a book (admin access required)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Book deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid book ID
+        '403':
+          description: Admin access required
+        '404':
+          description: Book not found
+        '500':
+          description: Internal server error
+
+  # --------- Admin Chapters ---------
+  /api/admin/chapters:
+    get:
+      tags:
+        - Admin Chapters
+      summary: Admin get all chapters
+      description: Returns all chapters in the system (admin access required)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of chapters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Chapter'
+        '403':
+          description: Admin access required
+        '500':
+          description: Internal server error
+    
+    post:
+      tags:
+        - Admin Chapters
+      summary: Admin create a chapter
+      description: Create a new chapter (admin access required)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - book_id
+                - title
+              properties:
+                book_id:
+                  type: integer
+                title:
+                  type: string
+                content:
+                  type: string
+                order_index:
+                  type: integer
+      responses:
+        '201':
+          description: Chapter created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Chapter'
+        '400':
+          description: Invalid input
+        '403':
+          description: Admin access required
+        '500':
+          description: Internal server error
+
+  # Similar patterns continue for admin endpoints for all other resources (Notes, Comments, Characters, MapItems, Stats)
+  # Each follows the same RESTful pattern as seen above
